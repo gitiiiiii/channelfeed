@@ -9,6 +9,7 @@
 *.swp
 *.swo
 *~
+*.iml
 **/.project
 **/.classpath
 **/.settings/
@@ -155,6 +156,13 @@
 **/web/build/
 **/.flutter-plugins
 **/.flutter-plugins-dependencies
+
+# Flutter: files required for a complete, buildable repository
+!**/analysis_options.yaml
+!**/android/gradlew
+!**/android/gradlew.bat
+!**/android/gradle/wrapper/gradle-wrapper.jar
+!**/android/gradle/wrapper/gradle-wrapper.properties
 
 # Compressed files
 *.zip
