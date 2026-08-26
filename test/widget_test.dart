@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:channelfeed/main.dart';
 import 'package:channelfeed/models/channel.dart';
+import 'package:channelfeed/models/preferences.dart';
 import 'package:channelfeed/models/video.dart';
 import 'package:channelfeed/screens/channels_screen.dart';
 import 'package:channelfeed/screens/home_screen.dart';
 import 'package:channelfeed/screens/profile_screen.dart';
 import 'package:channelfeed/services/channel_service.dart';
 import 'package:channelfeed/services/feed_service.dart';
+import 'package:channelfeed/services/local_store.dart';
 import 'package:channelfeed/services/settings_service.dart';
 import 'package:channelfeed/utils/formats.dart';
 import 'package:channelfeed/widgets/video_card.dart';
@@ -134,6 +137,72 @@ void main() {
       expect(settings.autoplay, isFalse);
       expect(settings.themeMode, ThemeMode.dark);
     });
+
+    test('SettingsService reports changes to onChanged', () async {
+      Preferences? reported;
+      final settings = SettingsService(
+        onChanged: (value) async => reported = value,
+      );
+
+      settings.setAutoplay(false);
+      expect(reported?.autoplay, isFalse);
+
+      settings.setThemeMode(ThemeMode.light);
+      expect(reported?.themeMode, ThemeMode.light);
+    });
+
+    test('ChannelService reports selection to onSelectionChanged', () async {
+      Set<String>? reported;
+      final service = ChannelService(
+        channels: _testChannels,
+        onSelectionChanged: (ids) async => reported = ids,
+      );
+
+      service.toggleSelection('a');
+      expect(reported, <String>{'a'});
+
+      service.toggleSelection('b');
+      expect(reported, <String>{'a', 'b'});
+
+      service.toggleSelection('a');
+      expect(reported, <String>{'b'});
+    });
+  });
+
+  group('LocalStore', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+    });
+
+    test('loads defaults when nothing is stored', () async {
+      final preferences = await LocalStore.loadPreferences();
+      expect(preferences.themeMode, ThemeMode.system);
+      expect(preferences.autoplay, isTrue);
+      expect(preferences.showViewCounts, isTrue);
+
+      final followed = await LocalStore.loadFollowedIds();
+      expect(followed, isNull);
+    });
+
+    test('round-trips preferences', () async {
+      await LocalStore.savePreferences(const Preferences(
+        themeMode: ThemeMode.dark,
+        autoplay: false,
+        showViewCounts: false,
+      ));
+
+      final loaded = await LocalStore.loadPreferences();
+      expect(loaded.themeMode, ThemeMode.dark);
+      expect(loaded.autoplay, isFalse);
+      expect(loaded.showViewCounts, isFalse);
+    });
+
+    test('round-trips followed channel ids', () async {
+      await LocalStore.saveFollowedIds(<String>{'b', 'a', 'c'});
+
+      final loaded = await LocalStore.loadFollowedIds();
+      expect(loaded, <String>{'a', 'b', 'c'});
+    });
   });
 
   group('ChannelFeed app', () {
@@ -226,6 +295,35 @@ void main() {
           .map((t) => t.data)
           .whereType<String>();
       expect(alphaTexts.any((t) => t.contains('views')), isFalse);
+    });
+
+    testWidgets('follow selection and settings persist to storage',
+        (tester) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      await _pumpApp(
+        tester,
+        ChannelFeedApp(
+          persistPreferences: LocalStore.savePreferences,
+          persistSelection: LocalStore.saveFollowedIds,
+        ),
+      );
+
+      await tester.tap(_navDestination('Channels'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Follow').first);
+      await tester.pumpAndSettle();
+
+      await tester.tap(_navDestination('Profile'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Show view counts'));
+      await tester.pumpAndSettle();
+
+      final prefs = await SharedPreferences.getInstance();
+      final storedIds = prefs.getStringList(LocalStore.followedChannelIdsKey);
+      expect(storedIds, isNotNull);
+      expect(storedIds!.length, 3);
+      expect(storedIds, containsAll(<String>['aurora', 'codeforge']));
+      expect(prefs.getBool(LocalStore.showViewCountsKey), isFalse);
     });
   });
 }

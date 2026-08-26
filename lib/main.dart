@@ -2,15 +2,27 @@ import 'package:flutter/material.dart';
 
 import 'data/mock_data.dart';
 import 'models/channel.dart';
+import 'models/preferences.dart';
 import 'models/user_profile.dart';
 import 'models/video.dart';
 import 'screens/home_shell.dart';
 import 'services/channel_service.dart';
 import 'services/feed_service.dart';
+import 'services/local_store.dart';
 import 'services/settings_service.dart';
 
-void main() {
-  runApp(const ChannelFeedApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final preferences = await LocalStore.loadPreferences();
+  final followedIds = await LocalStore.loadFollowedIds();
+  runApp(
+    ChannelFeedApp(
+      initialPreferences: preferences,
+      initialSelected: followedIds,
+      persistPreferences: LocalStore.savePreferences,
+      persistSelection: LocalStore.saveFollowedIds,
+    ),
+  );
 }
 
 /// Root widget. Services are created once here and injected into the shell,
@@ -22,12 +34,18 @@ class ChannelFeedApp extends StatefulWidget {
     this.videos,
     this.userProfile,
     this.initialSelected,
+    this.initialPreferences,
+    this.persistPreferences,
+    this.persistSelection,
   });
 
   final List<Channel>? channels;
   final List<Video>? videos;
   final UserProfile? userProfile;
   final Set<String>? initialSelected;
+  final Preferences? initialPreferences;
+  final Future<void> Function(Preferences preferences)? persistPreferences;
+  final Future<void> Function(Set<String> selectedIds)? persistSelection;
 
   @override
   State<ChannelFeedApp> createState() => _ChannelFeedAppState();
@@ -45,14 +63,18 @@ class _ChannelFeedAppState extends State<ChannelFeedApp> {
     final channels = widget.channels ?? mockChannels;
     _channelService = ChannelService(
       channels: channels,
-      initiallySelected: widget.initialSelected ??
-          const <String>{'aurora', 'codeforge'},
+      initiallySelected:
+          widget.initialSelected ?? const <String>{'aurora', 'codeforge'},
+      onSelectionChanged: widget.persistSelection,
     );
     _feedService = FeedService(
       channelService: _channelService,
       videos: widget.videos ?? buildMockVideos(),
     );
-    _settingsService = SettingsService();
+    _settingsService = SettingsService(
+      initial: widget.initialPreferences,
+      onChanged: widget.persistPreferences,
+    );
     _userProfile = widget.userProfile ??
         const UserProfile(name: 'Alex Chen', email: 'alex.chen@example.com');
   }

@@ -5,18 +5,23 @@ import '../models/channel.dart';
 /// Holds the full channel directory and the set of followed channels.
 ///
 /// Notifies listeners whenever the selection changes so the feed, search
-/// results, and profile stay in sync.
+/// results, and profile stay in sync. An optional [onSelectionChanged] callback
+/// fires after every change so the caller can persist the selection
+/// (see [LocalStore]).
 class ChannelService extends ChangeNotifier {
   ChannelService({
     required List<Channel> channels,
     Set<String>? initiallySelected,
+    Future<void> Function(Set<String> selectedIds)? onSelectionChanged,
   }) : _allChannels = List.unmodifiable(channels) {
     _byId = <String, Channel>{for (final channel in _allChannels) channel.id: channel};
     _selectedIds = <String>{...?initiallySelected}
       ..removeWhere((id) => !_byId.containsKey(id));
+    _onSelectionChanged = onSelectionChanged;
   }
 
   final List<Channel> _allChannels;
+  Future<void> Function(Set<String> selectedIds)? _onSelectionChanged;
   late final Map<String, Channel> _byId;
   late final Set<String> _selectedIds;
 
@@ -51,5 +56,6 @@ class ChannelService extends ChangeNotifier {
       _selectedIds.add(id);
     }
     notifyListeners();
+    _onSelectionChanged?.call(<String>{..._selectedIds});
   }
 }
