@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../models/channel.dart';
 import '../models/video.dart';
 
-/// Realistic sample channels used until the YouTube API is integrated.
+/// Realistic sample channels used until a YouTube API key is configured.
+/// `thumbnailUrl` is `null` so the UI stays fully offline-safe (it renders
+/// generated avatars); real artwork arrives with live API results.
 const List<Channel> mockChannels = <Channel>[
   Channel(
     id: 'aurora',

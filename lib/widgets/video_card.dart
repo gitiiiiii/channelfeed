@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/channel.dart';
 import '../models/video.dart';
+import 'channel_avatar.dart';
 import 'video_thumbnail.dart';
 
 /// A single video entry in the Home feed.
@@ -45,17 +46,7 @@ class VideoCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: channel.brandColor,
-                    child: Text(
-                      channel.initial,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
+                  ChannelAvatar(channel: channel, radius: 18),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(

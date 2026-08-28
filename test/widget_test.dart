@@ -14,6 +14,7 @@ import 'package:channelfeed/services/feed_service.dart';
 import 'package:channelfeed/services/local_store.dart';
 import 'package:channelfeed/services/settings_service.dart';
 import 'package:channelfeed/utils/formats.dart';
+import 'package:channelfeed/widgets/channel_card.dart';
 import 'package:channelfeed/widgets/video_card.dart';
 
 const List<Channel> _testChannels = <Channel>[
@@ -125,7 +126,9 @@ void main() {
       service.toggleSelection('a');
       expect(feed.followedVideos.map((v) => v.id), <String>['a-1']);
 
-      feed.filter = FeedFilter.channels;
+      // Every filter mode is scoped to followed channels.
+      expect(feed.resolve(FeedFilter.all).map((v) => v.id), <String>['a-1']);
+      expect(feed.resolve(FeedFilter.latest).map((v) => v.id), <String>['a-1']);
       expect(feed.resolve(FeedFilter.channels).map((v) => v.id), <String>['a-1']);
     });
 
@@ -166,6 +169,30 @@ void main() {
 
       service.toggleSelection('a');
       expect(reported, <String>{'b'});
+    });
+
+    test('ChannelService upserts channels and restores selection', () async {
+      Set<String>? reported;
+      final service = ChannelService(
+        channels: _testChannels,
+        onSelectionChanged: (ids) async => reported = ids,
+      );
+
+      service.upsertChannels(const <Channel>[
+        Channel(
+          id: 'c',
+          name: 'Real Channel',
+          handle: '@real',
+          subscriberCount: 5000,
+          description: 'From the API.',
+          brandColor: Color(0xFF6C5CE7),
+        ),
+      ]);
+      expect(service.channelById('c'), isNotNull);
+
+      service.setSelected(const <String>{'c'});
+      expect(service.isSelected('c'), isTrue);
+      expect(reported, <String>{'c'});
     });
   });
 
@@ -250,7 +277,61 @@ void main() {
       expect(find.text('3 following'), findsOneWidget);
     });
 
-    testWidgets('Channels feed filter only shows followed channels', (tester) async {
+    testWidgets('channel search filters results by name', (tester) async {
+      await _pumpApp(tester, const ChannelFeedApp());
+
+      await tester.tap(_navDestination('Channels'));
+      await tester.pumpAndSettle();
+
+      final channelScreenCards = find.descendant(
+        of: find.byType(ChannelsScreen),
+        matching: find.byType(ChannelCard),
+      );
+      expect(channelScreenCards, findsWidgets);
+
+      await tester.enterText(find.byType(TextField), 'code');
+      await tester.pumpAndSettle();
+
+      expect(channelScreenCards, findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(ChannelsScreen),
+          matching: find.text('CodeForge'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(ChannelsScreen),
+          matching: find.text('Aurora Labs'),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('home feed shows an empty state when nothing is selected', (tester) async {
+      await _pumpApp(
+        tester,
+        ChannelFeedApp(initialSelected: const <String>{}),
+      );
+
+      expect(find.text('No channels selected'), findsOneWidget);
+
+      final browseButton = find.descendant(
+        of: find.byType(HomeScreen),
+        matching: find.text('Browse channels'),
+      );
+      expect(browseButton, findsOneWidget);
+      await tester.tap(browseButton);
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+        1,
+      );
+    });
+
+    testWidgets('home feed only shows followed channels in every mode', (tester) async {
       final now = DateTime.now();
       await _pumpApp(
         tester,
@@ -261,16 +342,27 @@ void main() {
         ),
       );
 
+      // Default "Latest" mode: only the followed channel's video appears.
       expect(find.text('Alpha first video'), findsOneWidget);
-      expect(find.text('Beta first video'), findsOneWidget);
+      expect(find.text('Beta first video'), findsNothing);
 
+      // "All" mode stays scoped to followed channels.
+      final allSegment = find.descendant(
+        of: find.byType(SegmentedButton<FeedFilter>),
+        matching: find.text('All'),
+      );
+      await tester.tap(allSegment);
+      await tester.pumpAndSettle();
+      expect(find.text('Alpha first video'), findsOneWidget);
+      expect(find.text('Beta first video'), findsNothing);
+
+      // "Channels" mode renders the grouped view, still followed-only.
       final channelsSegment = find.descendant(
         of: find.byType(SegmentedButton<FeedFilter>),
         matching: find.text('Channels'),
       );
       await tester.tap(channelsSegment);
       await tester.pumpAndSettle();
-
       expect(find.text('Alpha first video'), findsOneWidget);
       expect(find.text('Beta first video'), findsNothing);
     });

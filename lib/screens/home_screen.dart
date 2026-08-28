@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/channel.dart';
 import '../models/video.dart';
 import '../services/channel_service.dart';
 import '../services/feed_service.dart';
 import '../services/settings_service.dart';
+import '../widgets/channel_avatar.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/video_card.dart';
 
@@ -22,6 +24,30 @@ class HomeScreen extends StatelessWidget {
   final ChannelService channelService;
   final SettingsService settingsService;
   final VoidCallback? onOpenChannels;
+
+  /// Opens a video in the official YouTube app/browser without modifying it.
+  Future<void> _openVideo(BuildContext context, Video video) async {
+    final uri = Uri.parse('https://www.youtube.com/watch?v=${video.id}');
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && context.mounted) {
+        _showOpenError(context);
+      }
+    } catch (_) {
+      if (context.mounted) {
+        _showOpenError(context);
+      }
+    }
+  }
+
+  void _showOpenError(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open this video.')),
+    );
+  }
 
   Widget _buildFilterBar() {
     return Padding(
@@ -49,6 +75,35 @@ class HomeScreen extends StatelessWidget {
         onSelectionChanged: (selection) {
           feedService.filter = selection.first;
         },
+      ),
+    );
+  }
+
+  Widget _buildNoChannelsState() {
+    return EmptyState(
+      icon: Icons.subscriptions_outlined,
+      title: 'No channels selected',
+      message: 'Your feed is built only from channels you follow. '
+          'Select a few to see their videos here.',
+      action: onOpenChannels == null
+          ? null
+          : FilledButton.icon(
+              onPressed: onOpenChannels,
+              icon: const Icon(Icons.add),
+              label: const Text('Browse channels'),
+            ),
+    );
+  }
+
+  Widget _buildFeedErrorState() {
+    return EmptyState(
+      icon: Icons.cloud_off,
+      title: 'Could not load your feed',
+      message: feedService.errorMessage ?? 'Something went wrong.',
+      action: FilledButton.icon(
+        onPressed: feedService.refresh,
+        icon: const Icon(Icons.refresh),
+        label: const Text('Retry'),
       ),
     );
   }
@@ -82,27 +137,13 @@ class HomeScreen extends StatelessWidget {
           video: video,
           channel: channel,
           showViewCounts: settingsService.showViewCounts,
+          onTap: () => _openVideo(context, video),
         );
       },
     );
   }
 
   Widget _buildChannelsView(BuildContext context) {
-    if (!channelService.hasSelection) {
-      return EmptyState(
-        icon: Icons.subscriptions_outlined,
-        title: 'No channels yet',
-        message: 'The Channels filter shows videos only from channels you '
-            'follow. Pick a few to personalize this feed.',
-        action: onOpenChannels == null
-            ? null
-            : FilledButton.icon(
-                onPressed: onOpenChannels,
-                icon: const Icon(Icons.add),
-                label: const Text('Browse channels'),
-              ),
-      );
-    }
     final grouped = <(Channel, List<Video>)>[];
     for (final channel in channelService.selectedChannels) {
       final videos = feedService.allVideos
@@ -128,18 +169,7 @@ class HomeScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
             child: Row(
               children: <Widget>[
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: channel.brandColor,
-                  child: Text(
-                    channel.initial,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+                ChannelAvatar(channel: channel, radius: 14),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -156,10 +186,29 @@ class HomeScreen extends StatelessWidget {
               video: video,
               channel: channel,
               showViewCounts: settingsService.showViewCounts,
+              onTap: () => _openVideo(context, video),
             ),
         ],
       ],
     );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    if (!channelService.hasSelection) {
+      return _buildNoChannelsState();
+    }
+    if (feedService.isLive) {
+      if (feedService.isLoading && !feedService.hasData) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      if (feedService.errorMessage != null && !feedService.hasData) {
+        return _buildFeedErrorState();
+      }
+    }
+    if (feedService.filter == FeedFilter.channels) {
+      return _buildChannelsView(context);
+    }
+    return _buildVideoList(context, feedService.resolve(feedService.filter));
   }
 
   @override
@@ -194,10 +243,7 @@ class HomeScreen extends StatelessWidget {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 640),
-                    child: feedService.filter == FeedFilter.channels
-                        ? _buildChannelsView(context)
-                        : _buildVideoList(
-                            context, feedService.resolve(feedService.filter)),
+                    child: _buildContent(context),
                   ),
                 ),
               ),

@@ -9,6 +9,7 @@ class Video {
     required this.duration,
     required this.publishedAt,
     required this.views,
+    this.thumbnailUrl,
   });
 
   final String id;
@@ -17,6 +18,10 @@ class Video {
   final Duration duration;
   final DateTime publishedAt;
   final int views;
+
+  /// Remote artwork for the video when it comes from a live API. `null` in
+  /// offline/mock mode, where the UI falls back to generated artwork.
+  final String? thumbnailUrl;
 
   String get durationLabel => formatDuration(duration);
   String get viewsLabel => '${formatCompactNumber(views)} views';

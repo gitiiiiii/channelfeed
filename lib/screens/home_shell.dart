@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/user_profile.dart';
 import '../services/channel_service.dart';
+import '../services/content_repository.dart';
 import '../services/feed_service.dart';
 import '../services/settings_service.dart';
 import 'channels_screen.dart';
@@ -16,12 +17,16 @@ class HomeShell extends StatefulWidget {
     required this.feedService,
     required this.settingsService,
     required this.userProfile,
+    this.repository,
   });
 
   final ChannelService channelService;
   final FeedService feedService;
   final SettingsService settingsService;
   final UserProfile userProfile;
+
+  /// Live data source for the Channels search tab.
+  final ContentRepository? repository;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -43,7 +48,10 @@ class _HomeShellState extends State<HomeShell> {
         settingsService: widget.settingsService,
         onOpenChannels: _goToChannels,
       ),
-      ChannelsScreen(channelService: widget.channelService),
+      ChannelsScreen(
+        channelService: widget.channelService,
+        repository: widget.repository,
+      ),
       ProfileScreen(
         userProfile: widget.userProfile,
         channelService: widget.channelService,

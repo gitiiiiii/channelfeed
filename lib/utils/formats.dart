@@ -30,6 +30,22 @@ String formatDuration(Duration duration) {
   return '$mm:$ss';
 }
 
+/// Parses an ISO 8601 duration such as `PT1H2M3S` (as returned by the YouTube
+/// Data API) into a [Duration]. Returns [Duration.zero] for malformed input.
+Duration parseIso8601Duration(String input) {
+  final match = RegExp(
+    r'^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$',
+  ).firstMatch(input.trim());
+  if (match == null) {
+    return Duration.zero;
+  }
+  return Duration(
+    hours: int.tryParse(match.group(1) ?? '') ?? 0,
+    minutes: int.tryParse(match.group(2) ?? '') ?? 0,
+    seconds: int.tryParse(match.group(3) ?? '') ?? 0,
+  );
+}
+
 /// Formats a timestamp as a short relative label such as "3h ago".
 String formatRelativeTime(DateTime time, {DateTime? now}) {
   final reference = now ?? DateTime.now();

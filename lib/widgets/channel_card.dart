@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/channel.dart';
+import 'channel_avatar.dart';
 
 /// A channel row used in search results, showing a follow/selected toggle.
 class ChannelCard extends StatelessWidget {
@@ -25,18 +26,7 @@ class ChannelCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: <Widget>[
-            CircleAvatar(
-              radius: 26,
-              backgroundColor: channel.brandColor,
-              child: Text(
-                channel.initial,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
+            ChannelAvatar(channel: channel, radius: 26),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -51,7 +41,10 @@ class ChannelCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${channel.handle} \u2022 ${channel.subscriberLabel}',
+                    [
+                      channel.handle,
+                      channel.subscriberLabel,
+                    ].whereType<String>().join(' \u2022 '),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall
