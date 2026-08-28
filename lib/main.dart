@@ -8,6 +8,7 @@ import 'models/preferences.dart';
 import 'models/user_profile.dart';
 import 'models/video.dart';
 import 'screens/home_shell.dart';
+import 'services/auth_service.dart';
 import 'services/channel_service.dart';
 import 'services/content_repository.dart';
 import 'services/feed_service.dart';
@@ -17,6 +18,8 @@ import 'services/youtube_api_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final authService = AuthService();
+  await authService.initialize();
   final preferences = await LocalStore.loadPreferences();
   final followedIds = await LocalStore.loadFollowedIds();
   final repository = YoutubeContentRepository(YoutubeApiService());
@@ -27,6 +30,7 @@ Future<void> main() async {
       persistPreferences: LocalStore.savePreferences,
       persistSelection: LocalStore.saveFollowedIds,
       repository: repository,
+      authService: authService,
     ),
   );
 }
@@ -44,6 +48,7 @@ class ChannelFeedApp extends StatefulWidget {
     this.persistPreferences,
     this.persistSelection,
     this.repository,
+    this.authService,
   });
 
   final List<Channel>? channels;
@@ -58,6 +63,9 @@ class ChannelFeedApp extends StatefulWidget {
   /// offline mode with mock data.
   final ContentRepository? repository;
 
+  /// Google sign-in state for the Profile tab.
+  final AuthService? authService;
+
   @override
   State<ChannelFeedApp> createState() => _ChannelFeedAppState();
 }
@@ -68,11 +76,13 @@ class _ChannelFeedAppState extends State<ChannelFeedApp> {
   late final SettingsService _settingsService;
   late final UserProfile _userProfile;
   late final ContentRepository? _repository;
+  late final AuthService? _authService;
 
   @override
   void initState() {
     super.initState();
     _repository = widget.repository;
+    _authService = widget.authService;
     final isLive = _repository?.isLive ?? false;
     final channels = widget.channels ?? mockChannels;
     _channelService = ChannelService(
@@ -140,6 +150,7 @@ class _ChannelFeedAppState extends State<ChannelFeedApp> {
             settingsService: _settingsService,
             userProfile: _userProfile,
             repository: _repository,
+            authService: _authService,
           ),
         );
       },

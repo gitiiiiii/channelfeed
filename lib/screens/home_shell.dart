@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/user_profile.dart';
+import '../services/auth_service.dart';
 import '../services/channel_service.dart';
 import '../services/content_repository.dart';
 import '../services/feed_service.dart';
@@ -18,6 +19,7 @@ class HomeShell extends StatefulWidget {
     required this.settingsService,
     required this.userProfile,
     this.repository,
+    this.authService,
   });
 
   final ChannelService channelService;
@@ -27,6 +29,9 @@ class HomeShell extends StatefulWidget {
 
   /// Live data source for the Channels search tab.
   final ContentRepository? repository;
+
+  /// Optional Google sign-in state for the Profile tab.
+  final AuthService? authService;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -57,6 +62,7 @@ class _HomeShellState extends State<HomeShell> {
         channelService: widget.channelService,
         settingsService: widget.settingsService,
         onManageChannels: _goToChannels,
+        authService: widget.authService,
       ),
     ];
 
