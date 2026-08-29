@@ -8,6 +8,7 @@ import '../services/settings_service.dart';
 import '../widgets/channel_avatar.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/video_card.dart';
+import 'selected_channels_screen.dart';
 import 'youtube_webview_screen.dart';
 
 /// Home tab: the personalized vertical feed.
@@ -44,6 +45,21 @@ class HomeScreen extends StatelessWidget {
         builder: (_) => YoutubeWebViewScreen(
           initialUrl: channel.youtubeUrl,
           title: channel.name,
+        ),
+      ),
+    );
+  }
+
+  /// Opens the selected-channels browsing screen.
+  void _openSelectedChannels(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SelectedChannelsScreen(
+          channelService: channelService,
+          onBrowseChannels: () {
+            Navigator.of(context).pop();
+            onOpenChannels?.call();
+          },
         ),
       ),
     );
@@ -255,6 +271,13 @@ class HomeScreen extends StatelessWidget {
             ),
           ],
         ),
+        actions: <Widget>[
+          IconButton(
+            tooltip: 'Selected channels',
+            icon: const Icon(Icons.subscriptions_outlined),
+            onPressed: () => _openSelectedChannels(context),
+          ),
+        ],
       ),
       body: ListenableBuilder(
         listenable: Listenable.merge(<Listenable>[

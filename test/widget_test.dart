@@ -9,6 +9,7 @@ import 'package:channelfeed/models/video.dart';
 import 'package:channelfeed/screens/channels_screen.dart';
 import 'package:channelfeed/screens/home_screen.dart';
 import 'package:channelfeed/screens/profile_screen.dart';
+import 'package:channelfeed/screens/selected_channels_screen.dart';
 import 'package:channelfeed/services/channel_service.dart';
 import 'package:channelfeed/services/feed_service.dart';
 import 'package:channelfeed/services/local_store.dart';
@@ -365,6 +366,77 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Alpha first video'), findsOneWidget);
       expect(find.text('Beta first video'), findsNothing);
+    });
+
+    testWidgets('selected channels screen lists follows and removes instantly',
+        (tester) async {
+      await _pumpApp(tester, const ChannelFeedApp());
+
+      await tester.tap(find.byTooltip('Selected channels'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SelectedChannelsScreen), findsOneWidget);
+      expect(find.text('Aurora Labs'), findsOneWidget);
+      expect(find.text('CodeForge'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Remove CodeForge'));
+      await tester.pumpAndSettle();
+      expect(find.text('CodeForge'), findsNothing);
+      expect(find.text('Aurora Labs'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Remove Aurora Labs'));
+      await tester.pumpAndSettle();
+      expect(find.text('No channels selected'), findsOneWidget);
+    });
+
+    testWidgets('selected channels empty state browses to the Channels tab',
+        (tester) async {
+      await _pumpApp(
+        tester,
+        ChannelFeedApp(initialSelected: const <String>{}),
+      );
+
+      await tester.tap(find.byTooltip('Selected channels'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SelectedChannelsScreen), findsOneWidget);
+      expect(find.text('No channels selected'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Browse channels'));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+        1,
+      );
+    });
+
+    testWidgets('channels followed later appear without an app restart',
+        (tester) async {
+      await _pumpApp(
+        tester,
+        ChannelFeedApp(initialSelected: const <String>{'aurora'}),
+      );
+
+      await tester.tap(find.byTooltip('Selected channels'));
+      await tester.pumpAndSettle();
+      expect(find.text('Aurora Labs'), findsOneWidget);
+      expect(find.text('CodeForge'), findsNothing);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.tap(_navDestination('Channels'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Follow').first);
+      await tester.pumpAndSettle();
+
+      await tester.tap(_navDestination('Home'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Selected channels'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Aurora Labs'), findsOneWidget);
+      expect(find.text('CodeForge'), findsOneWidget);
     });
 
     testWidgets('profile settings toggle view counts on cards', (tester) async {
