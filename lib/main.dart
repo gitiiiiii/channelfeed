@@ -10,9 +10,11 @@ import 'models/video.dart';
 import 'screens/home_shell.dart';
 import 'services/auth_service.dart';
 import 'services/channel_service.dart';
+import 'services/cloud_selection_store.dart';
 import 'services/content_repository.dart';
 import 'services/feed_service.dart';
 import 'services/local_store.dart';
+import 'services/selection_sync.dart';
 import 'services/settings_service.dart';
 import 'services/youtube_api_service.dart';
 
@@ -20,6 +22,11 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final authService = AuthService();
   await authService.initialize();
+  final cloudStore = CloudSelectionStore(
+    accessTokenProvider: () => authService.getAccessToken(
+      const <String>[CloudSelectionStore.driveAppdataScope],
+    ),
+  );
   final preferences = await LocalStore.loadPreferences();
   final followedIds = await LocalStore.loadFollowedIds();
   final repository = YoutubeContentRepository(YoutubeApiService());
@@ -31,6 +38,7 @@ Future<void> main() async {
       persistSelection: LocalStore.saveFollowedIds,
       repository: repository,
       authService: authService,
+      cloudStore: cloudStore,
     ),
   );
 }
@@ -49,6 +57,7 @@ class ChannelFeedApp extends StatefulWidget {
     this.persistSelection,
     this.repository,
     this.authService,
+    this.cloudStore,
   });
 
   final List<Channel>? channels;
@@ -66,6 +75,10 @@ class ChannelFeedApp extends StatefulWidget {
   /// Google sign-in state for the Profile tab.
   final AuthService? authService;
 
+  /// Cloud persistence for the followed-channel selection, used to sync the
+  /// selection across devices when the user is signed in.
+  final CloudSelectionStore? cloudStore;
+
   @override
   State<ChannelFeedApp> createState() => _ChannelFeedAppState();
 }
@@ -77,12 +90,15 @@ class _ChannelFeedAppState extends State<ChannelFeedApp> {
   late final UserProfile _userProfile;
   late final ContentRepository? _repository;
   late final AuthService? _authService;
+  late final CloudSelectionStore? _cloudStore;
+  SelectionSync? _selectionSync;
 
   @override
   void initState() {
     super.initState();
     _repository = widget.repository;
     _authService = widget.authService;
+    _cloudStore = widget.cloudStore;
     final isLive = _repository?.isLive ?? false;
     final channels = widget.channels ?? mockChannels;
     _channelService = ChannelService(
@@ -104,9 +120,24 @@ class _ChannelFeedAppState extends State<ChannelFeedApp> {
     );
     _userProfile = widget.userProfile ??
         const UserProfile(name: 'Alex Chen', email: 'alex.chen@example.com');
+    final cloudStore = _cloudStore;
+    final authService = _authService;
+    if (cloudStore != null && authService != null) {
+      _selectionSync = SelectionSync(
+        authService: authService,
+        channelService: _channelService,
+        store: cloudStore,
+      )..start();
+    }
     if (isLive) {
       unawaited(_hydrateSelectedChannels());
     }
+  }
+
+  @override
+  void dispose() {
+    _selectionSync?.dispose();
+    super.dispose();
   }
 
   /// Restores real YouTube channels that were followed before a restart by

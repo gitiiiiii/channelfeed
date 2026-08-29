@@ -76,6 +76,27 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Returns an OAuth access token for [scopes], prompting the user to grant
+  /// access if it has not been granted yet, or null when signed out or the
+  /// request fails.
+  Future<String?> getAccessToken(List<String> scopes) async {
+    final account = _account;
+    if (account == null) {
+      return null;
+    }
+    final client = account.authorizationClient;
+    final cached = await client.authorizationForScopes(scopes);
+    if (cached != null) {
+      return cached.accessToken;
+    }
+    try {
+      final prompted = await client.authorizeScopes(scopes);
+      return prompted.accessToken;
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   void dispose() {
     _subscription?.cancel();
