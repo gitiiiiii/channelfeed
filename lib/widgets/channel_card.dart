@@ -4,17 +4,24 @@ import '../models/channel.dart';
 import 'channel_avatar.dart';
 
 /// A channel row used in search results, showing a follow/selected toggle.
+///
+/// Tapping the row (outside the follow button) opens the channel's YouTube
+/// page via [onOpen].
 class ChannelCard extends StatelessWidget {
   const ChannelCard({
     super.key,
     required this.channel,
     required this.selected,
     required this.onToggle,
+    this.onOpen,
   });
 
   final Channel channel;
   final bool selected;
   final VoidCallback onToggle;
+
+  /// Called when the card body is tapped, e.g. to open the channel page.
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -22,53 +29,57 @@ class ChannelCard extends StatelessWidget {
     final primary = theme.colorScheme.primary;
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: <Widget>[
-            ChannelAvatar(channel: channel, radius: 26),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    channel.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    [
-                      channel.handle,
-                      channel.subscriberLabel,
-                    ].whereType<String>().join(' \u2022 '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            selected
-                ? FilledButton.tonalIcon(
-                    onPressed: onToggle,
-                    icon: const Icon(Icons.check, size: 18),
-                    label: const Text('Following'),
-                  )
-                : OutlinedButton.icon(
-                    onPressed: onToggle,
-                    icon: Icon(Icons.add, size: 18, color: primary),
-                    label: Text(
-                      'Follow',
-                      style: TextStyle(color: primary),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: <Widget>[
+              ChannelAvatar(channel: channel, radius: 26),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      channel.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
                     ),
-                  ),
-          ],
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        channel.handle,
+                        channel.subscriberLabel,
+                      ].whereType<String>().join(' \u2022 '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              selected
+                  ? FilledButton.tonalIcon(
+                      onPressed: onToggle,
+                      icon: const Icon(Icons.check, size: 18),
+                      label: const Text('Following'),
+                    )
+                  : OutlinedButton.icon(
+                      onPressed: onToggle,
+                      icon: Icon(Icons.add, size: 18, color: primary),
+                      label: Text(
+                        'Follow',
+                        style: TextStyle(color: primary),
+                      ),
+                    ),
+            ],
+          ),
         ),
       ),
     );

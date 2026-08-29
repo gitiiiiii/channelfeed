@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../models/channel.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/channel_service.dart';
 import '../services/settings_service.dart';
+import 'youtube_webview_screen.dart';
 
 /// Profile tab: user info, followed channels, and preferences.
 class ProfileScreen extends StatelessWidget {
@@ -220,6 +222,17 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  void _openChannel(BuildContext context, Channel channel) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => YoutubeWebViewScreen(
+          initialUrl: channel.youtubeUrl,
+          title: channel.name,
+        ),
+      ),
+    );
+  }
+
   Widget _buildChannelsSection(BuildContext context) {
     final theme = Theme.of(context);
     final selected = channelService.selectedChannels;
@@ -269,6 +282,7 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ),
                       label: Text(channel.name),
+                      onPressed: () => _openChannel(context, channel),
                       onDeleted: () =>
                           channelService.toggleSelection(channel.id),
                     ),

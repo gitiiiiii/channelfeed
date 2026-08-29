@@ -7,6 +7,7 @@ import '../services/channel_service.dart';
 import '../services/content_repository.dart';
 import '../widgets/channel_card.dart';
 import '../widgets/empty_state.dart';
+import 'youtube_webview_screen.dart';
 
 /// Channels tab: search the channel directory and follow channels.
 ///
@@ -92,6 +93,17 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
     widget.channelService.toggleSelection(channel.id);
   }
 
+  void _openChannel(Channel channel) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => YoutubeWebViewScreen(
+          initialUrl: channel.youtubeUrl,
+          title: channel.name,
+        ),
+      ),
+    );
+  }
+
   Widget _buildLocalResults(BuildContext context) {
     return ListenableBuilder(
       listenable: widget.channelService,
@@ -115,6 +127,7 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
                   widget.channelService.isSelected(channel.id),
               onToggle: () =>
                   widget.channelService.toggleSelection(channel.id),
+              onOpen: () => _openChannel(channel),
             );
           },
         );
@@ -165,6 +178,7 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
               channel: channel,
               selected: widget.channelService.isSelected(channel.id),
               onToggle: () => _followRemoteChannel(channel),
+              onOpen: () => _openChannel(channel),
             );
           },
         );

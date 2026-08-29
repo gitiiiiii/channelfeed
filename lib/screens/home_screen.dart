@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/channel.dart';
 import '../models/video.dart';
@@ -9,6 +8,7 @@ import '../services/settings_service.dart';
 import '../widgets/channel_avatar.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/video_card.dart';
+import 'youtube_webview_screen.dart';
 
 /// Home tab: the personalized vertical feed.
 class HomeScreen extends StatelessWidget {
@@ -25,27 +25,27 @@ class HomeScreen extends StatelessWidget {
   final SettingsService settingsService;
   final VoidCallback? onOpenChannels;
 
-  /// Opens a video in the official YouTube app/browser without modifying it.
+  /// Opens a video in an in-app YouTube WebView without modifying it.
   Future<void> _openVideo(BuildContext context, Video video) async {
-    final uri = Uri.parse('https://www.youtube.com/watch?v=${video.id}');
-    try {
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!launched && context.mounted) {
-        _showOpenError(context);
-      }
-    } catch (_) {
-      if (context.mounted) {
-        _showOpenError(context);
-      }
-    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => YoutubeWebViewScreen(
+          initialUrl: 'https://www.youtube.com/watch?v=${video.id}',
+          title: 'YouTube',
+        ),
+      ),
+    );
   }
 
-  void _showOpenError(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Could not open this video.')),
+  /// Opens a channel's YouTube page in an in-app WebView.
+  Future<void> _openChannel(BuildContext context, Channel channel) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => YoutubeWebViewScreen(
+          initialUrl: channel.youtubeUrl,
+          title: channel.name,
+        ),
+      ),
     );
   }
 
@@ -167,18 +167,25 @@ class HomeScreen extends StatelessWidget {
         for (final (channel, videos) in grouped) ...<Widget>[
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Row(
-              children: <Widget>[
-                ChannelAvatar(channel: channel, radius: 14),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    channel.name,
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => _openChannel(context, channel),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Row(
+                  children: <Widget>[
+                    ChannelAvatar(channel: channel, radius: 14),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        channel.name,
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
           for (final video in videos)

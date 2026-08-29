@@ -36,6 +36,16 @@ class Channel {
   String get subscriberLabel =>
       '${formatCompactNumber(subscriberCount)} subscribers';
 
+  /// The public YouTube page for this channel.
+  String get youtubeUrl {
+    final handle = this.handle;
+    if (handle != null && handle.isNotEmpty) {
+      final at = handle.startsWith('@') ? handle : '@$handle';
+      return 'https://www.youtube.com/$at';
+    }
+    return 'https://www.youtube.com/channel/$id';
+  }
+
   Channel copyWith({
     String? name,
     String? handle,
