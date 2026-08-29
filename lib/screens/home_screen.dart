@@ -193,22 +193,42 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  /// Makes a non-scrollable state (e.g. EmptyState) fill the viewport while
+  /// remaining pull-to-refresh compatible.
+  Widget _fillScrollable(Widget child) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildContent(BuildContext context) {
+    final Widget content;
     if (!channelService.hasSelection) {
-      return _buildNoChannelsState();
-    }
-    if (feedService.isLive) {
+      content = _fillScrollable(_buildNoChannelsState());
+    } else if (feedService.isLive) {
       if (feedService.isLoading && !feedService.hasData) {
-        return const Center(child: CircularProgressIndicator());
+        content = const Center(child: CircularProgressIndicator());
+      } else if (feedService.errorMessage != null && !feedService.hasData) {
+        content = _fillScrollable(_buildFeedErrorState());
+      } else if (feedService.filter == FeedFilter.channels) {
+        content = _buildChannelsView(context);
+      } else {
+        content = _buildVideoList(context, feedService.resolve(feedService.filter));
       }
-      if (feedService.errorMessage != null && !feedService.hasData) {
-        return _buildFeedErrorState();
-      }
+    } else if (feedService.filter == FeedFilter.channels) {
+      content = _buildChannelsView(context);
+    } else {
+      content = _buildVideoList(context, feedService.resolve(feedService.filter));
     }
-    if (feedService.filter == FeedFilter.channels) {
-      return _buildChannelsView(context);
-    }
-    return _buildVideoList(context, feedService.resolve(feedService.filter));
+    return content;
   }
 
   @override
@@ -243,7 +263,10 @@ class HomeScreen extends StatelessWidget {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 640),
-                    child: _buildContent(context),
+                    child: RefreshIndicator(
+                      onRefresh: feedService.refresh,
+                      child: _buildContent(context),
+                    ),
                   ),
                 ),
               ),

@@ -18,7 +18,8 @@ abstract class ContentRepository {
 
   Future<List<Channel>> fetchChannelDetails(List<String> ids);
 
-  Future<List<Video>> fetchRecentVideos(Set<String> channelIds);
+  Future<List<Video>> fetchRecentVideos(Set<String> channelIds,
+      {bool forceRefresh = false});
 }
 
 /// Live repository backed by the YouTube Data API v3.
@@ -39,6 +40,7 @@ class YoutubeContentRepository implements ContentRepository {
       _api.getChannelDetails(ids);
 
   @override
-  Future<List<Video>> fetchRecentVideos(Set<String> channelIds) =>
-      _api.getRecentVideos(channelIds.toList());
+  Future<List<Video>> fetchRecentVideos(Set<String> channelIds,
+          {bool forceRefresh = false}) =>
+      _api.getRecentVideos(channelIds.toList(), forceRefresh: forceRefresh);
 }

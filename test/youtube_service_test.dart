@@ -44,7 +44,8 @@ class FakeContentRepository implements ContentRepository {
   }
 
   @override
-  Future<List<Video>> fetchRecentVideos(Set<String> channelIds) async {
+  Future<List<Video>> fetchRecentVideos(Set<String> channelIds,
+      {bool forceRefresh = false}) async {
     feedCalls.add(channelIds);
     if (throwOnFeed) {
       throw const YoutubeApiException('boom');
@@ -230,6 +231,64 @@ void main() {
         throwsA(isA<YoutubeApiException>()),
       );
     });
+
+    test('reuses per-channel searches when the selection grows', () async {
+      final searchCalls = <String>[];
+      var videosCalls = 0;
+      final client = MockClient((request) async {
+        final path = request.url.path;
+        if (path == '/youtube/v3/search') {
+          final channelId = request.url.queryParameters['channelId']!;
+          searchCalls.add(channelId);
+          return _jsonResponse(<String, Object>{
+            'items': <Object>[
+              <String, Object>{
+                'id': <String, String>{'videoId': '$channelId-1'},
+                'snippet': <String, Object>{
+                  'channelId': channelId,
+                },
+              },
+            ],
+          });
+        }
+        if (path == '/youtube/v3/videos') {
+          videosCalls++;
+          return _jsonResponse(<String, Object>{'items': <Object>[]});
+        }
+        fail('Unexpected path $path');
+      });
+
+      final service = YoutubeApiService(client: client, apiKey: 'test-key');
+      await service.getRecentVideos(<String>['a']);
+      await service.getRecentVideos(<String>['a', 'b']);
+
+      expect(searchCalls, <String>['a', 'b']);
+      expect(videosCalls, 2);
+    });
+
+    test('forceRefresh bypasses the cached feed', () async {
+      var calls = 0;
+      final client = MockClient((request) async {
+        calls++;
+        final path = request.url.path;
+        if (path == '/youtube/v3/search') {
+          return _jsonResponse(<String, Object>{'items': <Object>[]});
+        }
+        if (path == '/youtube/v3/videos') {
+          return _jsonResponse(<String, Object>{'items': <Object>[]});
+        }
+        fail('Unexpected path $path');
+      });
+
+      final service = YoutubeApiService(client: client, apiKey: 'test-key');
+      await service.getRecentVideos(<String>['a']);
+      final cachedCount = calls;
+      await service.getRecentVideos(<String>['a']);
+      expect(calls, cachedCount);
+
+      await service.getRecentVideos(<String>['a'], forceRefresh: true);
+      expect(calls, greaterThan(cachedCount));
+    });
   });
 
   group('FeedService live mode', () {
@@ -334,6 +393,63 @@ void main() {
       await feed.refresh();
       expect(feed.errorMessage, isNotNull);
       expect(feed.hasData, isTrue);
+    });
+
+    test('unchanged selection does not trigger another fetch', () async {
+      final service = ChannelService(channels: <Channel>[
+        Channel(
+          id: 'c1',
+          name: 'C1',
+          brandColor: const Color(0xFF6C5CE7),
+          subscriberCount: 1,
+          description: '',
+        ),
+      ], initiallySelected: const <String>{'c1'});
+      final repo = FakeContentRepository();
+      final feed = FeedService(
+        channelService: service,
+        videos: const <Video>[],
+        repository: repo,
+      );
+      await feed.refresh();
+      final callCount = repo.feedCalls.length;
+
+      service.upsertChannels(<Channel>[
+        Channel(
+          id: 'c1',
+          name: 'C1 renamed',
+          brandColor: const Color(0xFF6C5CE7),
+          subscriberCount: 2,
+          description: 'Updated.',
+        ),
+      ]);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repo.feedCalls.length, callCount);
+    });
+
+    test('explicit refresh always refetches, even for the same selection',
+        () async {
+      final service = ChannelService(channels: <Channel>[
+        Channel(
+          id: 'c1',
+          name: 'C1',
+          brandColor: const Color(0xFF6C5CE7),
+          subscriberCount: 1,
+          description: '',
+        ),
+      ], initiallySelected: const <String>{'c1'});
+      final repo = FakeContentRepository();
+      final feed = FeedService(
+        channelService: service,
+        videos: const <Video>[],
+        repository: repo,
+      );
+      await feed.refresh();
+      final callCount = repo.feedCalls.length;
+
+      await feed.refresh();
+      expect(repo.feedCalls.length, callCount + 1);
     });
   });
 

@@ -99,33 +99,29 @@ class YoutubeApiService {
   /// Fetches the most recent uploads for every channel in [channelIds],
   /// merged and sorted newest-first. Uses one batched `videos.list` call for
   /// duration and view counts instead of a per-video round trip.
+  ///
+  /// Each channel's upload ids are cached separately, so growing the selection
+  /// only searches for the newly added channels. Set [forceRefresh] to bypass
+  /// the cache (used for explicit user refreshes).
   Future<List<Video>> getRecentVideos(List<String> channelIds,
-      {int maxResults = _maxResults}) async {
+      {int maxResults = _maxResults, bool forceRefresh = false}) async {
     final unique = (channelIds.toSet().toList()..sort());
     if (unique.isEmpty) {
       return const <Video>[];
     }
     final cacheKey = 'feed:${unique.join(',')}';
-    final cached = _read<List<Video>>(cacheKey);
-    if (cached != null) {
-      return cached;
+    if (!forceRefresh) {
+      final cached = _read<List<Video>>(cacheKey);
+      if (cached != null) {
+        return cached;
+      }
     }
 
     final uploadIds = <String>{};
     for (final channelId in unique) {
-      final search = await _getJson('search', <String, String>{
-        'part': 'snippet',
-        'type': 'video',
-        'channelId': channelId,
-        'order': 'date',
-        'maxResults': '$maxResults',
-      });
-      for (final item in search['items'] as List<dynamic>? ?? const <dynamic>[]) {
-        final videoId = (item as Map<String, dynamic>)['id']?['videoId'];
-        if (videoId is String) {
-          uploadIds.add(videoId);
-        }
-      }
+      final ids = await _uploadIdsFor(channelId,
+          maxResults: maxResults, forceRefresh: forceRefresh);
+      uploadIds.addAll(ids);
     }
 
     final videos = uploadIds.isEmpty
@@ -133,6 +129,34 @@ class YoutubeApiService {
         : await _videosById(uploadIds.toList());
     _write(cacheKey, videos);
     return videos;
+  }
+
+  /// Returns the ids of the latest uploads for [channelId], cached per channel
+  /// so a selection change never re-searches channels already fetched.
+  Future<List<String>> _uploadIdsFor(String channelId,
+      {required int maxResults, bool forceRefresh = false}) async {
+    final cacheKey = 'uploadIds:$channelId';
+    if (!forceRefresh) {
+      final cached = _read<List<String>>(cacheKey);
+      if (cached != null) {
+        return cached;
+      }
+    }
+    final search = await _getJson('search', <String, String>{
+      'part': 'snippet',
+      'type': 'video',
+      'channelId': channelId,
+      'order': 'date',
+      'maxResults': '$maxResults',
+    });
+    final ids = <String>[
+      for (final item
+          in search['items'] as List<dynamic>? ?? const <dynamic>[])
+        if ((item as Map<String, dynamic>)['id']?['videoId'] is String)
+          (item['id'] as Map<String, dynamic>)['videoId'] as String,
+    ];
+    _write(cacheKey, ids);
+    return ids;
   }
 
   Future<List<Video>> _videosById(List<String> ids) async {

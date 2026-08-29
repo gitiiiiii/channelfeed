@@ -58,6 +58,7 @@ class FeedService extends ChangeNotifier {
   List<Video>? _liveVideos;
   Future<void>? _inflight;
   bool _refreshQueued = false;
+  Set<String>? _lastFetchedIds;
 
   /// Whether the feed is backed by the live YouTube API.
   bool get isLive => repository?.isLive ?? false;
@@ -82,25 +83,31 @@ class FeedService extends ChangeNotifier {
 
   bool get hasVideos => hasData;
 
-  /// Re-fetches the feed for the currently selected channels. While a refresh
-  /// is in flight, further calls return the same future and are coalesced
-  /// into a single trailing refresh, so rapid selection changes end with
-  /// fresh data and every caller awaits completion.
+  /// Re-fetches the feed for the currently selected channels. This is an
+  /// explicit refresh (e.g. the Retry button) and always hits the network,
+  /// bypassing the in-memory cache. While a refresh is in flight, further
+  /// calls return the same future and are coalesced into a single trailing
+  /// refresh, so rapid selection changes end with fresh data and every caller
+  /// awaits completion.
   Future<void> refresh() {
     if (!isLive) {
       return Future<void>.value();
     }
+    return _refresh(forceRefresh: true);
+  }
+
+  Future<void> _refresh({required bool forceRefresh}) {
     final inflight = _inflight;
     if (inflight != null) {
       _refreshQueued = true;
       return inflight;
     }
-    final cycle = _runRefreshCycle();
+    final cycle = _runRefreshCycle(forceRefresh: forceRefresh);
     _inflight = cycle;
     return cycle;
   }
 
-  Future<void> _runRefreshCycle() async {
+  Future<void> _runRefreshCycle({required bool forceRefresh}) async {
     do {
       _refreshQueued = false;
       _isLoading = true;
@@ -108,7 +115,9 @@ class FeedService extends ChangeNotifier {
       notifyListeners();
       try {
         final ids = channelService.selectedChannels.map((c) => c.id).toSet();
-        _liveVideos = await repository!.fetchRecentVideos(ids);
+        _liveVideos = await repository!.fetchRecentVideos(ids,
+            forceRefresh: forceRefresh);
+        _lastFetchedIds = ids;
       } catch (error) {
         _errorMessage = error.toString();
       } finally {
@@ -121,9 +130,21 @@ class FeedService extends ChangeNotifier {
 
   void _handleChannelsChanged() {
     notifyListeners();
-    if (isLive) {
-      unawaited(refresh());
+    if (isLive && !_selectionUnchanged()) {
+      unawaited(_refresh(forceRefresh: false));
     }
+  }
+
+  /// Whether the current data was fetched for exactly the currently selected
+  /// channels, so an automatic refresh can be skipped.
+  bool _selectionUnchanged() {
+    final last = _lastFetchedIds;
+    if (last == null) {
+      return false;
+    }
+    final current =
+        channelService.selectedChannels.map((c) => c.id).toSet();
+    return setEquals(last, current);
   }
 
   List<Video> get _baseVideos =>
